@@ -55,6 +55,7 @@ Changelog = "https://github.com/ocrmypdf/OCRmyPDF/tree/main/docs/releasenotes"
 # User-installable features - use `uv sync --extra <name>` or `pip install ocrmypdf[name]`
 watcher = ["watchdog>=1.0.2", "cyclopts>=3", "python-dotenv"]
 webservice = ["streamlit>=1.41.0"]
+gui = ["PyQt6>=6"]
 
 [project.scripts]
 ocrmypdf = "ocrmypdf.__main__:run"

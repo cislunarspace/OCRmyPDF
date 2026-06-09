@@ -26,6 +26,10 @@ class EnvironmentCheck(TypedDict):
 CommandRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 
 
+def run_command(argv: Sequence[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(argv, capture_output=True, text=True)
+
+
 def parse_tesseract_languages(output: str) -> set[str]:
     return {
         line.strip()
@@ -44,7 +48,7 @@ def missing_languages(
 def check_environment(
     selected_languages: str,
     *,
-    runner: CommandRunner = subprocess.run,
+    runner: CommandRunner = run_command,
 ) -> EnvironmentCheck:
     ocrmypdf = _probe_command(['ocrmypdf', '--version'], runner)
     tesseract = _probe_command(['tesseract', '--version'], runner)
@@ -64,8 +68,8 @@ def _probe_command(argv: list[str], runner: CommandRunner) -> CommandProbe:
         result = runner(argv)
     except FileNotFoundError:
         return CommandProbe(False, f'{argv[0]} was not found on PATH')
-    message = (result.stdout or result.stderr).strip().splitlines()[0]
-    return CommandProbe(result.returncode == 0, message)
+    message = (result.stdout or result.stderr).strip().splitlines()
+    return CommandProbe(result.returncode == 0, message[0] if message else '')
 
 
 def _probe_languages(runner: CommandRunner) -> set[str]:

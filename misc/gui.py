@@ -30,18 +30,9 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 
 def _create_main_window():
-    from PyQt6.QtWidgets import QLabel, QMainWindow, QWidget, QVBoxLayout
+    from ocrmypdf._gui.app import create_main_window
 
-    window = QMainWindow()
-    window.setWindowTitle('OCRmyPDF')
-    window.resize(640, 360)
-
-    central_widget = QWidget()
-    layout = QVBoxLayout(central_widget)
-    layout.addWidget(QLabel('OCRmyPDF desktop GUI'))
-    layout.addWidget(QLabel('Select an input PDF, choose OCR options, and run OCR.'))
-    window.setCentralWidget(central_widget)
-    return window
+    return create_main_window()
 
 
 def main(argv: list[str] | None = None) -> int:

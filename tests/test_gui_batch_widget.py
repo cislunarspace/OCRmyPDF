@@ -31,7 +31,7 @@ def test_batch_tab_exposes_expected_controls(monkeypatch):
     assert tab.findChild(QLineEdit, 'batchOutputDirEdit') is not None
     assert tab.findChild(QPushButton, 'batchBrowseOutButton') is not None
     assert tab.findChild(QComboBox, 'batchLanguagePresetCombo') is not None
-    assert tab.findChild(QLineEdit, 'batchLanguageEdit').text() == 'eng'
+    assert tab.findChild(QLineEdit, 'batchLanguageEdit').text() == 'chi_sim'
     assert tab.findChild(QComboBox, 'batchProcessingModeCombo') is not None
     assert tab.findChild(QSpinBox, 'batchMaxRetriesSpin').value() == 1
     assert tab.findChild(QTableWidget, 'batchFileTable') is not None
@@ -60,3 +60,22 @@ def test_batch_tab_in_main_window_tabs(monkeypatch):
     assert tabs.count() == 2
     assert tabs.tabText(0) == 'Single file'
     assert tabs.tabText(1) == 'Batch folder'
+
+
+def test_batch_tab_initial_preset_syncs_language_field(monkeypatch):
+    """The default preset (Chinese OCR, index 0) should set language to chi_sim."""
+    pytest.importorskip('PyQt6')
+    monkeypatch.setenv('QT_QPA_PLATFORM', 'offscreen')
+
+    from PyQt6.QtWidgets import QApplication, QComboBox, QLineEdit
+
+    from ocrmypdf._gui.batch_widget import create_batch_tab
+
+    app = QApplication.instance() or QApplication([])
+    tab = create_batch_tab()
+
+    language_edit = tab.findChild(QLineEdit, 'batchLanguageEdit')
+    combo = tab.findChild(QComboBox, 'batchLanguagePresetCombo')
+
+    assert combo.currentIndex() == 0
+    assert language_edit.text() == 'chi_sim'

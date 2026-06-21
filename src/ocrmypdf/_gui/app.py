@@ -278,6 +278,7 @@ def _create_single_tab(
     language_preset_combo.currentIndexChanged.connect(
         lambda _index: apply_language_preset(language_preset_combo, language_edit)
     )
+    apply_language_preset(language_preset_combo, language_edit)
     input_path_edit.textChanged.connect(update_output_path)
     input_path_edit.textChanged.connect(update_command_preview)
     output_path_edit.textChanged.connect(update_command_preview)

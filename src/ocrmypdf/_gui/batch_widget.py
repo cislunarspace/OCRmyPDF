@@ -371,5 +371,6 @@ def create_batch_tab(
     language_preset_combo.currentIndexChanged.connect(
         lambda _index: apply_language_preset(language_preset_combo, language_edit)
     )
+    apply_language_preset(language_preset_combo, language_edit)
 
     return tab

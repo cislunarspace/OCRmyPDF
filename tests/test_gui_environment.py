@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 
 from ocrmypdf._gui.environment import (
     CommandProbe,
@@ -11,6 +12,8 @@ from ocrmypdf._gui.environment import (
     missing_languages,
     parse_tesseract_languages,
 )
+
+_OCRMYPDF_VERSION_CMD = [sys.executable, '-m', 'ocrmypdf', '--version']
 
 
 def test_parse_tesseract_languages_skips_header():
@@ -29,7 +32,7 @@ def test_missing_languages_reports_selected_codes_not_installed():
 
 def test_check_environment_reports_available_tools_and_languages():
     def runner(argv):
-        if argv == ['ocrmypdf', '--version']:
+        if argv == _OCRMYPDF_VERSION_CMD:
             return subprocess.CompletedProcess(argv, 0, stdout='17.4.2\n', stderr='')
         if argv == ['tesseract', '--version']:
             return subprocess.CompletedProcess(argv, 0, stdout='tesseract 5.5.1\n', stderr='')
@@ -55,7 +58,7 @@ def test_check_environment_reports_available_tools_and_languages():
 
 def test_check_environment_reports_missing_language_with_hint():
     def runner(argv):
-        if argv == ['ocrmypdf', '--version']:
+        if argv == _OCRMYPDF_VERSION_CMD:
             return subprocess.CompletedProcess(argv, 0, stdout='17.4.2\n', stderr='')
         if argv == ['tesseract', '--version']:
             return subprocess.CompletedProcess(argv, 0, stdout='tesseract 5.5.1\n', stderr='')
@@ -76,7 +79,7 @@ def test_check_environment_reports_missing_language_with_hint():
 
 def test_check_environment_reports_executable_failure():
     def runner(argv):
-        if argv == ['ocrmypdf', '--version']:
+        if argv == _OCRMYPDF_VERSION_CMD:
             raise FileNotFoundError('ocrmypdf')
         if argv == ['tesseract', '--version']:
             return subprocess.CompletedProcess(argv, 0, stdout='tesseract 5.5.1\n', stderr='')
@@ -88,5 +91,5 @@ def test_check_environment_reports_executable_failure():
 
     assert result['ocrmypdf'] == CommandProbe(
         is_available=False,
-        message='ocrmypdf was not found on PATH',
+        message=f'{sys.executable} was not found on PATH',
     )

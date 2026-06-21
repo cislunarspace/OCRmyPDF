@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TypedDict
@@ -50,7 +51,9 @@ def check_environment(
     *,
     runner: CommandRunner = run_command,
 ) -> EnvironmentCheck:
-    ocrmypdf = _probe_command(['ocrmypdf', '--version'], runner)
+    ocrmypdf = _probe_command(
+        [sys.executable, '-m', 'ocrmypdf', '--version'], runner
+    )
     tesseract = _probe_command(['tesseract', '--version'], runner)
     installed_languages = _probe_languages(runner) if tesseract.is_available else set()
     missing = missing_languages(selected_languages, installed_languages)

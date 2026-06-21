@@ -26,13 +26,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ocrmypdf._gui.batch import default_output_path as _batch_default_output_path
 from ocrmypdf._gui.batch_widget import create_batch_tab
 from ocrmypdf._gui.command import CommandOptions, build_command
 from ocrmypdf._gui.discovery import SUPPORTED_INPUT_SUFFIXES
 from ocrmypdf._gui.environment import EnvironmentCheck, check_environment
 from ocrmypdf._gui.presets import BUILT_IN_PRESETS
-from ocrmypdf._gui.widgets import apply_language_preset, with_button
+from ocrmypdf._gui.widgets import apply_language_preset, default_output_path, with_button
 
 PROCESSING_MODES = {
     'Automatic / Default': 'default',
@@ -141,7 +140,7 @@ def _create_single_tab(
     def default_output_path(input_path: str) -> str:
         if not input_path:
             return ''
-        return str(_batch_default_output_path(Path(input_path), None))
+        return str(default_output_path(Path(input_path), None))
 
     def build_current_command():
         input_path = input_path_edit.text().strip()

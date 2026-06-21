@@ -30,12 +30,11 @@ from PyQt6.QtWidgets import (
 from ocrmypdf._gui.batch import (
     BatchProcessor,
     FileTask,
-    default_output_path,
 )
-from ocrmypdf._gui.discovery import discover_input_files
+from ocrmypdf._gui.discovery import discover_batch
 from ocrmypdf._gui.environment import check_environment
 from ocrmypdf._gui.presets import BUILT_IN_PRESETS
-from ocrmypdf._gui.widgets import apply_language_preset, with_button
+from ocrmypdf._gui.widgets import apply_language_preset, default_output_path, with_button
 
 STATUS_ICONS = {
     'pending': '⏳',
@@ -216,14 +215,14 @@ def create_batch_tab(
         """Create FileTask objects from the scanned directory."""
         input_dir = Path(input_dir_edit.text().strip())
         out_dir_text = output_dir_edit.text().strip()
-        output_dir = Path(out_dir_text) if out_dir_text else None
-        files = discover_input_files(input_dir)
+        output_dir = Path(out_dir_text) if out_dir_text else input_dir
+        jobs = discover_batch(input_dir, output_dir, recursive=False, output_suffix='_ocr.pdf')
         return [
             FileTask(
-                input_path=f,
-                output_path=default_output_path(f, output_dir),
+                input_path=job['input_file'],
+                output_path=job['output_file'],
             )
-            for f in files
+            for job in jobs
         ]
 
     def start_processor(tasks: list[FileTask]) -> None:
@@ -289,14 +288,7 @@ def create_batch_tab(
         nonlocal _tasks
         if not _tasks:
             return
-        # Re-scan to pick up any new files
-        tasks = build_tasks()
-        if not tasks:
-            return
-        _tasks = tasks
-        populate_table()
-        append_status(f'{len(_tasks)} PDF files found — checking environment…')
-        # Check environment once before starting
+        # Check environment before committing new state
         language = language_edit.text().strip() or 'eng'
         env = environment_checker(language)
         if not env['ocrmypdf'].is_available:
@@ -308,6 +300,13 @@ def create_batch_tab(
         if env['language_message']:
             append_status(env['language_message'])
             return
+        # Re-scan to pick up any new files
+        tasks = build_tasks()
+        if not tasks:
+            return
+        _tasks = tasks
+        populate_table()
+        append_status(f'{len(_tasks)} PDF files found')
         start_processor(tasks)
 
     def cancel_batch() -> None:

@@ -5,7 +5,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QPushButton, QWidget
+
+
+def default_output_path(input_path: Path, output_dir: Path | None) -> Path:
+    """Compute the OCR output path for *input_path*."""
+    stem = input_path.stem
+    out_name = f'{stem}_ocr.pdf'
+    directory = output_dir if output_dir is not None else input_path.parent
+    return directory / out_name
 
 
 def with_button(line_edit: QLineEdit, button: QPushButton) -> QWidget:

@@ -38,14 +38,18 @@ def discover_single_file(input_file: Path) -> list[DiscoveredJob]:
 
 
 def discover_batch(
-    input_dir: Path, output_dir: Path, *, recursive: bool
+    input_dir: Path,
+    output_dir: Path,
+    *,
+    recursive: bool,
+    output_suffix: str = '.pdf',
 ) -> list[DiscoveredJob]:
     input_files = discover_input_files(input_dir, recursive=recursive)
     jobs = [
         {
             'input_file': input_file,
             'output_file': _batch_output_file(
-                input_dir, output_dir, input_file, recursive
+                input_dir, output_dir, input_file, recursive, output_suffix
             ),
         }
         for input_file in input_files
@@ -61,13 +65,17 @@ def _is_supported_input(input_file: Path) -> bool:
 
 
 def _batch_output_file(
-    input_dir: Path, output_dir: Path, input_file: Path, recursive: bool
+    input_dir: Path,
+    output_dir: Path,
+    input_file: Path,
+    recursive: bool,
+    output_suffix: str = '.pdf',
 ) -> Path:
     if recursive:
-        relative_output = input_file.relative_to(input_dir).with_suffix('.pdf')
+        relative_output = input_file.relative_to(input_dir).with_suffix(output_suffix)
         output_file = output_dir / relative_output
     else:
-        output_file = output_dir / f'{input_file.stem}.pdf'
+        output_file = output_dir / f'{input_file.stem}{output_suffix}'
     if output_file == input_file:
         return input_file.with_name(f'{input_file.stem}_ocr.pdf')
     return output_file

@@ -20,15 +20,19 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QPushButton,
+    QTabWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
+from ocrmypdf._gui.batch import default_output_path as _batch_default_output_path
+from ocrmypdf._gui.batch_widget import create_batch_tab
 from ocrmypdf._gui.command import CommandOptions, build_command
 from ocrmypdf._gui.discovery import SUPPORTED_INPUT_SUFFIXES
 from ocrmypdf._gui.environment import EnvironmentCheck, check_environment
 from ocrmypdf._gui.presets import BUILT_IN_PRESETS
+from ocrmypdf._gui.widgets import apply_language_preset, with_button
 
 PROCESSING_MODES = {
     'Automatic / Default': 'default',
@@ -50,6 +54,35 @@ def create_main_window(
     window.setWindowTitle('OCRmyPDF')
     window.resize(800, 560)
 
+    tabs = QTabWidget()
+
+    # -- Single-file tab ------------------------------------------------------
+
+    single_tab = _create_single_tab(
+        environment_checker=environment_checker,
+        process_starter=process_starter,
+    )
+    tabs.addTab(single_tab, 'Single file')
+
+    # -- Batch tab ------------------------------------------------------------
+
+    batch_tab = create_batch_tab(environment_checker=environment_checker)
+    tabs.addTab(batch_tab, 'Batch folder')
+
+    # -- Main window ----------------------------------------------------------
+
+    window.setCentralWidget(tabs)
+
+    return window
+
+
+def _create_single_tab(
+    *,
+    environment_checker: EnvironmentChecker,
+    process_starter: ProcessStarter | None,
+) -> QWidget:
+    tab = QWidget()
+
     form_layout = QFormLayout()
     input_path_edit = _line_edit('inputPathEdit')
     output_path_edit = _line_edit('outputPathEdit')
@@ -62,8 +95,8 @@ def create_main_window(
     browse_output_button = QPushButton('Browse...')
     browse_output_button.setObjectName('browseOutputButton')
 
-    form_layout.addRow('Input file', _with_button(input_path_edit, browse_input_button))
-    form_layout.addRow('Output PDF', _with_button(output_path_edit, browse_output_button))
+    form_layout.addRow('Input file', with_button(input_path_edit, browse_input_button))
+    form_layout.addRow('Output PDF', with_button(output_path_edit, browse_output_button))
     form_layout.addRow('Language preset', language_preset_combo)
     form_layout.addRow('Language codes', language_edit)
     form_layout.addRow('Processing mode', processing_mode_combo)
@@ -96,11 +129,9 @@ def create_main_window(
     main_layout.addLayout(button_layout)
     main_layout.addWidget(QLabel('Log output'))
     main_layout.addWidget(log_output_edit)
+    tab.setLayout(main_layout)
 
-    central_widget = QWidget()
-    central_widget.setLayout(main_layout)
-    window.setCentralWidget(central_widget)
-    window.ocr_process = None
+    ocr_process_ref = {'process': None}
 
     previous_default_output_path = ''
 
@@ -110,8 +141,7 @@ def create_main_window(
     def default_output_path(input_path: str) -> str:
         if not input_path:
             return ''
-        path = Path(input_path)
-        return str(path.with_name(f'{path.stem}_ocr.pdf'))
+        return str(_batch_default_output_path(Path(input_path), None))
 
     def build_current_command():
         input_path = input_path_edit.text().strip()
@@ -134,7 +164,7 @@ def create_main_window(
                 input_path_edit.text().strip()
                 and output_path_edit.text().strip()
                 and language_edit.text().strip()
-                and window.ocr_process is None
+                and ocr_process_ref['process'] is None
             )
         )
 
@@ -154,14 +184,9 @@ def create_main_window(
         previous_default_output_path = default_output_path(input_path.strip())
         output_path_edit.setText(previous_default_output_path)
 
-    def apply_language_preset(_index: int) -> None:
-        preset = language_preset_combo.currentData()
-        if preset is not None:
-            language_edit.setText(preset.language)
-
     def browse_input() -> None:
         selected, _filter = QFileDialog.getOpenFileName(
-            window,
+            tab,
             'Select input file',
             '',
             INPUT_FILE_FILTER,
@@ -172,7 +197,7 @@ def create_main_window(
 
     def browse_output() -> None:
         selected, _filter = QFileDialog.getSaveFileName(
-            window,
+            tab,
             'Select output PDF',
             output_path_edit.text(),
             'PDF files (*.pdf)',
@@ -210,12 +235,12 @@ def create_main_window(
 
     def finish_process(exit_code: int, _exit_status=None) -> None:
         append_log(f'OCR finished with exit code {exit_code}')
-        window.ocr_process = None
+        ocr_process_ref['process'] = None
         cancel_ocr_button.setEnabled(False)
         update_run_button()
 
     def start_qprocess(argv: list[str]) -> QProcess:
-        process = QProcess(window)
+        process = QProcess(tab)
         process.setProgram(argv[0])
         process.setArguments(argv[1:])
         process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -233,22 +258,26 @@ def create_main_window(
         argv = process_argv(command.argv)
         log_output_edit.clear()
         append_log(f'Running: {command.display}')
-        window.ocr_process = process_starter(argv) if process_starter else start_qprocess(argv)
+        ocr_process_ref['process'] = (
+            process_starter(argv) if process_starter else start_qprocess(argv)
+        )
         run_ocr_button.setEnabled(False)
         cancel_ocr_button.setEnabled(True)
 
     def cancel_ocr() -> None:
-        process = window.ocr_process
+        process = ocr_process_ref['process']
         if process is None:
             return
         append_log('Cancelling OCR...')
         if hasattr(process, 'terminate'):
             process.terminate()
-        window.ocr_process = None
+        ocr_process_ref['process'] = None
         cancel_ocr_button.setEnabled(False)
         update_run_button()
 
-    language_preset_combo.currentIndexChanged.connect(apply_language_preset)
+    language_preset_combo.currentIndexChanged.connect(
+        lambda _index: apply_language_preset(language_preset_combo, language_edit)
+    )
     input_path_edit.textChanged.connect(update_output_path)
     input_path_edit.textChanged.connect(update_command_preview)
     output_path_edit.textChanged.connect(update_command_preview)
@@ -260,7 +289,7 @@ def create_main_window(
     cancel_ocr_button.clicked.connect(cancel_ocr)
     update_command_preview()
 
-    return window
+    return tab
 
 
 def _line_edit(name: str, text: str = '') -> QLineEdit:
@@ -275,12 +304,3 @@ def _combo_box(name: str, values) -> QComboBox:
     for label, value in values.items():
         combo_box.addItem(label, value)
     return combo_box
-
-
-def _with_button(line_edit: QLineEdit, button: QPushButton) -> QWidget:
-    layout = QHBoxLayout()
-    layout.addWidget(line_edit)
-    layout.addWidget(button)
-    widget = QWidget()
-    widget.setLayout(layout)
-    return widget

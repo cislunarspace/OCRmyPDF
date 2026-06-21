@@ -15,6 +15,16 @@ class DiscoveredJob(TypedDict):
 SUPPORTED_INPUT_SUFFIXES = {'.pdf', '.png', '.jpg', '.jpeg', '.tif', '.tiff', '.bmp'}
 
 
+def discover_input_files(directory: Path, *, recursive: bool = False) -> list[Path]:
+    """Return sorted list of supported input files in *directory*."""
+    entries = directory.rglob('*') if recursive else directory.iterdir()
+    return sorted(
+        entry
+        for entry in entries
+        if entry.is_file() and _is_supported_input(entry)
+    )
+
+
 def discover_single_file(input_file: Path) -> list[DiscoveredJob]:
     if not _is_supported_input(input_file):
         raise ValueError(f'Unsupported input file type: {input_file}')
@@ -30,7 +40,7 @@ def discover_single_file(input_file: Path) -> list[DiscoveredJob]:
 def discover_batch(
     input_dir: Path, output_dir: Path, *, recursive: bool
 ) -> list[DiscoveredJob]:
-    input_files = input_dir.rglob('*') if recursive else input_dir.iterdir()
+    input_files = discover_input_files(input_dir, recursive=recursive)
     jobs = [
         {
             'input_file': input_file,
@@ -38,8 +48,7 @@ def discover_batch(
                 input_dir, output_dir, input_file, recursive
             ),
         }
-        for input_file in sorted(input_files)
-        if input_file.is_file() and _is_supported_input(input_file)
+        for input_file in input_files
     ]
     _ensure_unique_outputs(jobs)
     for job in jobs:

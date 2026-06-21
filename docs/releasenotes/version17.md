@@ -3,8 +3,102 @@
 
 # v17
 
+## v17.7.1
+
+- Fixed a severe, Windows-specific performance regression in the "Scanning
+  contents" phase, most visible with `--redo-ocr` ({issue}`1662`). Since
+  v16.4.3, OCRmyPDF forced pdfminer's read buffer to 256 MiB to work around a
+  pdfminer bug that mishandled tokens split across the buffer boundary
+  ({issue}`1361`). On Windows, CPython's `BufferedReader.read()` eagerly
+  allocates a buffer of the requested size on every read, so the oversized
+  buffer made each of pdfminer's thousands of reads cost tens of milliseconds
+  (this allocation is lazy, and effectively free, on Linux). The underlying
+  pdfminer bug was fixed upstream in pdfminer.six 20250327
+  ([#1030](https://github.com/pdfminer/pdfminer.six/pull/1030)), with a
+  follow-up for tokens split across streams in 20260107
+  ([#1158](https://github.com/pdfminer/pdfminer.six/pull/1158)), so the
+  workaround has been removed and the minimum pdfminer.six version raised to
+  20260107.
+- The font discovery used to build the OCR text layer now finds variable fonts
+  such as `NotoSansArabic[wdth,wght].ttf`, the form shipped by Homebrew casks
+  and current Google Fonts releases. Previously only static `-Regular.ttf`/`.otf`
+  files were matched, so users who had installed the correct Noto font still got
+  the glyphless fallback and a "No font found" warning ({issue}`1652`).
+- Font discovery is now language-aware for CJK: each Chinese, Japanese, and
+  Korean language maps to its own per-language Noto family (NotoSansSC, TC, HK,
+  JP, KR), with the pan-CJK super font kept as a shared fallback, since the
+  per-language fonts are region subsets that may lack glyphs from other scripts.
+- The warning shown when no installed font has glyphs for some text was reworded
+  to explain the consequence — the text is still added as a searchable, copyable
+  layer but appears blank when highlighted in a viewer — and to name the specific
+  font family to install.
+
+## v17.7.0
+
+- The Docker images now run as a non-root user (`app`, uid/gid 1000) by default
+  rather than as root, as a defense-in-depth measure. If you bind-mount a
+  directory for input and output, you may now need to add a `--user` argument so
+  the container can write to it; the correct value differs for rootless Docker,
+  Podman, and rootful Docker, and is described in the Docker documentation.
+  Piping the input and output through stdin/stdout still works with no
+  permission setup.
+- The Docker images now default their working directory to `/data`, so files in
+  a directory mounted there can be given as relative paths without an explicit
+  `--workdir`.
+- The Ubuntu Docker image now installs Tesseract 5 from the Ubuntu archive
+  instead of the third-party `alex-p/tesseract-ocr5` PPA, and the base images
+  were updated to Ubuntu 26.04 and Alpine 3.24.
+- Fixed a missing space in the error message shown when OCRmyPDF cannot access
+  its working directory inside a Docker container.
+- Updated packaged dependencies, including the optional web service stack
+  (starlette, tornado, python-multipart) and cryptography.
+
 ## v17.6.0
 
+- When the optimizer encounters an image it cannot process (for example, an
+  exotic colorspace that cannot be transcoded), it now logs a concise warning
+  that the image was left unchanged rather than printing an alarming
+  traceback. The output file was already valid in these cases; only the
+  reporting was misleading. The full traceback is still available at debug
+  verbosity (`-v 1`) ({issue}`846`).
+- `--pdfa-image-compression=auto` (the default) now selects lossless image
+  compression at `-O0` so Ghostscript no longer transcodes lossless images to
+  JPEG during PDF/A generation. At `-O1` and above, `auto` continues to defer
+  to Ghostscript's heuristic, which may recompress images lossily. `-O1` (the
+  default level) is kept as a historical exception because coercing it to
+  lossless can substantially bloat output; users who want guaranteed lossless
+  image handling should pass `--pdfa-image-compression=lossless` or use `-O0`
+  ({issue}`1124`).
+- `--pdfa-image-compression=lossless` now passes existing JPEG images through
+  unchanged rather than re-encoding them with a lossless codec. Re-encoding an
+  already-lossy JPEG losslessly cannot recover quality and only inflates the
+  file, so JPEGs are preserved while non-JPEG images are encoded losslessly.
+- OCRmyPDF now validates and repairs malformed page-boundary boxes
+  (``/MediaBox``, ``/CropBox``, ``/TrimBox``, ``/ArtBox``, ``/BleedBox``) in its
+  input, following the PDF 2.0 specification. Coordinates written in invalid
+  exponential notation are reinterpreted ({issue}`1398`); rectangles whose
+  corners are given in reversed order are normalized, which previously crashed
+  with ``NegativeDimensionError`` ({issue}`1526`); and a crop/trim/art/bleed box
+  that falls outside the MediaBox is clamped to their intersection, or discarded
+  when that intersection is empty, which previously produced an output with a
+  zero-height effective page that some viewers refused to open ({issue}`1400`).
+  When a box is discarded, clamped, or reinterpreted, OCRmyPDF logs a warning
+  recommending visual inspection of the output. Thanks @ajdlinux for the initial
+  fix in PR #1691.
+- OCRmyPDF now discards an embedded Adobe full-text search index
+  (``/Root/PieceInfo/SearchIndex``) from its output. This proprietary index,
+  produced by Acrobat's "Embed Index" feature, is read only by Adobe Acrobat;
+  other viewers ignore it and search the text on the fly. Because any change to
+  a PDF invalidates the index, retaining it after OCRmyPDF rewrites the document
+  would leave a stale index that returns incorrect search results in Acrobat.
+  Modern viewers rebuild a search index on demand, so there is no loss of
+  search capability.
+- OCRmyPDF now discards embedded per-page thumbnail images (the optional
+  ``/Thumb`` image XObject on a page) from its output. OCRmyPDF alters page
+  appearance (deskew, clean, rasterize, re-render) and plugins may edit pages
+  arbitrarily, so a retained thumbnail would be stale and no longer match its
+  page. Embedded thumbnails are a navigation aid that modern viewers generate
+  on demand, so there is no loss of functionality.
 - Fixed a regression in OCR quality for PDFs that paint a 1-bit image mask
   (stencil) with a gray or colored fill color. Previously such pages were
   rasterized as 1-bit black-and-white before OCR, so Ghostscript dithered
@@ -18,6 +112,31 @@
   better input for OCR on faint or anti-aliased scans at negligible cost and
   no change to output file size, since the rasterized image is an
   intermediate that is discarded after OCR.
+- When rasterizing pages with Ghostscript, OCRmyPDF now enables text and
+  graphics anti-aliasing (``-dTextAlphaBits=4 -dGraphicsAlphaBits=4``) for the
+  grayscale and color raster devices. Ghostscript 10.x renders aliased glyphs
+  that OCR frequently misreads as extra word breaks or substituted characters;
+  anti-aliasing materially improves OCR accuracy on the Ghostscript
+  rasterization path, especially for small fonts at moderate resolution. The
+  1-bit monochrome devices are unaffected, since they perform their own
+  anti-aliased downscaling and older Ghostscript versions reject alpha-bit
+  options on them. Note that the default rasterizer (``--rasterizer auto``)
+  prefers pypdfium2, which already anti-aliases; this change benefits users who
+  select ``--rasterizer ghostscript`` or do not have pypdfium2 installed.
+  OCRmyPDF now also logs which rasterizer rendered each page at debug verbosity
+  (``-v 1``), and the ``--rasterizer`` help text explains the OCR-quality
+  trade-off, to make such reports easier to diagnose. {issue}`1439`
+- When Tesseract reports a page with many diacritics, OCRmyPDF still logs its
+  interpreted "lots of diacritics - possibly poor OCR" hint, but now also emits
+  Tesseract's raw message at debug verbosity (``-v 1``) so the original wording
+  is available for diagnosis. {issue}`1566`
+- Added ``--mode strip``, which removes the invisible OCR text layer from a PDF
+  in place. Unlike ``--ocr-engine none --force-ocr``, it does not rasterize the
+  page, so images and visible content are preserved unchanged and the output is
+  smaller rather than larger. Only text drawn as invisible (PDF text render mode
+  3) is removed; some OCR engines -- and OCRmyPDF v2.2 and earlier -- express
+  text as visible glyphs covered by an opaque image, and that text cannot be
+  removed this way. {issue}`1435`
 
 ## v17.5.0
 

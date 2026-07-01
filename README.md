@@ -36,6 +36,7 @@ ocrmypdf                      # it's a scriptable command line program
 - Optimizes PDF images, often producing files smaller than the input file
 - If requested, deskews and/or cleans the image before performing OCR
 - Validates input and output files
+- Repairs common PDF page box errors (malformed coordinates, reversed rectangles, out-of-bounds crop boxes)
 - Distributes work across all available CPU cores
 - Uses [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) engine to recognize more than [100 languages](https://github.com/tesseract-ocr/tessdata)
 - Keeps your private data private.
@@ -62,7 +63,7 @@ I searched the web for a free command line tool to OCR PDF files: I found many, 
 
 ## Installation
 
-Linux, Windows, macOS and FreeBSD are supported. Docker images are also available, for both x64 and ARM.
+Linux, Windows, macOS and FreeBSD are supported. Docker images are also available, for both x64 and ARM (runs as non-root user by default for improved security).
 
 | Operating system              | Install command               |
 | ----------------------------- | ------------------------------|
@@ -78,6 +79,15 @@ Linux, Windows, macOS and FreeBSD are supported. Docker images are also availabl
 | Ubuntu Snap                   | ``snap install ocrmypdf``     |
 
 For everyone else, [see our documentation](https://ocrmypdf.readthedocs.io/en/latest/installation.html) for installation steps.
+
+### Desktop GUI
+
+A PyQt6-based desktop GUI is available for interactive use, supporting both single-file and batch folder OCR processing:
+
+```bash
+pip install ocrmypdf[gui]
+python misc/gui.py
+```
 
 ## Languages
 
@@ -143,6 +153,12 @@ ocrmypdf -l eng+fra Bilingual-English-French.pdf Bilingual-English-French.pdf
 
 # Deskew (straighten crooked pages)
 ocrmypdf --deskew input.pdf output.pdf
+
+# Strip the invisible OCR text layer without re-rasterizing (makes the file smaller)
+ocrmypdf --mode strip input.pdf output.pdf
+
+# Batch process a folder of PDFs via the GUI
+python misc/gui.py                # switch to the "Batch Folder" tab
 ```
 
 For more features, see the [documentation](https://ocrmypdf.readthedocs.io/en/latest/index.html).
